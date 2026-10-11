@@ -99,5 +99,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearLastScan() {
         _lastScan.value = null
+        lastScannedContent = null
+        lastScannedTimestamp = 0L
     }
 }

@@ -48,4 +48,41 @@ object QrGenerator {
             null
         }
     }
+
+    fun generateBarcode(
+        text: String,
+        format: BarcodeFormat,
+        width: Int = 600,
+        height: Int = 300,
+        foregroundColor: Int = Color.BLACK,
+        backgroundColor: Int = Color.WHITE
+    ): Bitmap? {
+        if (text.isBlank()) return null
+        return try {
+            val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
+                put(EncodeHintType.CHARACTER_SET, "UTF-8")
+                put(EncodeHintType.MARGIN, 2)
+            }
+
+            val bitMatrix: BitMatrix = MultiFormatWriter().encode(
+                text,
+                format,
+                width,
+                height,
+                hints
+            )
+            val matrixWidth = bitMatrix.width
+            val matrixHeight = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888)
+            for (x in 0 until matrixWidth) {
+                for (y in 0 until matrixHeight) {
+                    bitmap.setPixel(x, y, if (bitMatrix[x, y]) foregroundColor else backgroundColor)
+                }
+            }
+            bitmap
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

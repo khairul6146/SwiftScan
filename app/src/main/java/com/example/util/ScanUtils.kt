@@ -39,6 +39,34 @@ object ScanUtils {
         }
     }
 
+    fun is1dLinear(format: Int): Boolean {
+        return when (format) {
+            Barcode.FORMAT_CODE_128,
+            Barcode.FORMAT_CODE_39,
+            Barcode.FORMAT_CODE_93,
+            Barcode.FORMAT_CODABAR,
+            Barcode.FORMAT_EAN_13,
+            Barcode.FORMAT_EAN_8,
+            Barcode.FORMAT_ITF,
+            Barcode.FORMAT_UPC_A,
+            Barcode.FORMAT_UPC_E -> true
+            else -> false
+        }
+    }
+
+    fun is2dMatrix(format: Int): Boolean {
+        return when (format) {
+            Barcode.FORMAT_QR_CODE,
+            Barcode.FORMAT_DATA_MATRIX,
+            Barcode.FORMAT_AZTEC -> true
+            else -> false
+        }
+    }
+
+    fun isStacked2d(format: Int): Boolean {
+        return format == Barcode.FORMAT_PDF417
+    }
+
     fun getTypeName(type: Int, content: String): String {
         return when (type) {
             Barcode.TYPE_URL -> "Website URL"

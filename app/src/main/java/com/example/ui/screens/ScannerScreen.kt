@@ -95,6 +95,7 @@ fun ScannerScreen(
     val isOcrMode = scanMode == ScanMode.OCR
 
     var isDpmMode by remember { mutableStateOf(false) } // Direct Part Marking / High-Contrast mode
+    var isWideReticle by remember { mutableStateOf(false) } // Wide framing for 1D & PDF417
     var batchCount by remember { mutableIntStateOf(0) }
     var batchBannerText by remember { mutableStateOf<String?>(null) }
     val batchScannedSet = remember { mutableSetOf<String>() }
@@ -276,7 +277,9 @@ fun ScannerScreen(
         }
 
         // Configure Dual Barcode + OCR Analyzer
-        LaunchedEffect(cameraController, lastScan, scanMode, isDpmMode) {
+        // Note: Kept permanently bound across scan events (lastScan detached from keys)
+        // so CameraX frame pipeline never drops buffers or stalls upon sheet dismissal!
+        LaunchedEffect(cameraController, scanMode, isDpmMode) {
             cameraController.setImageAnalysisAnalyzer(
                 analysisExecutor,
                 MlKitAnalyzer(
@@ -285,11 +288,11 @@ fun ScannerScreen(
                     analysisExecutor
                 ) { result ->
                     // In single-mode, pause if result sheet is currently open
-                    if (scanMode == ScanMode.SINGLE && lastScan != null) return@MlKitAnalyzer
+                    if (scanMode == ScanMode.SINGLE && viewModel.lastScan.value != null) return@MlKitAnalyzer
 
                     val now = System.currentTimeMillis()
-                    // Throttle frame processing to every 220ms for smooth 60fps preview
-                    if (now - lastAnalysisTime < 220L) return@MlKitAnalyzer
+                    // Throttle frame processing to 180ms for ultra-responsive decoding
+                    if (now - lastAnalysisTime < 180L) return@MlKitAnalyzer
                     lastAnalysisTime = now
 
                     if (scanMode == ScanMode.OCR) {
@@ -360,7 +363,8 @@ fun ScannerScreen(
             ScannerOverlay(
                 isScanningActive = isBatchMode || lastScan == null,
                 isDpmActive = isDpmMode,
-                isOcrActive = isOcrMode
+                isOcrActive = isOcrMode,
+                isWide = isWideReticle
             )
 
             // TOP BAR: Quick Action Controls
@@ -378,7 +382,7 @@ fun ScannerScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left cluster: Flashlight, Sound & DPM Toggle
+                    // Left cluster: Flashlight, Sound, DPM & Wide-Reticle Toggle
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Flashlight toggle
                         IconButton(
@@ -424,6 +428,27 @@ fun ScannerScreen(
                                 imageVector = if (soundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
                                 contentDescription = "Toggle Audio Feedback",
                                 tint = if (soundEnabled) SafeEmerald else Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Wide-Reticle (1D / PDF417) toggle
+                        IconButton(
+                            onClick = {
+                                isWideReticle = !isWideReticle
+                                Toast.makeText(context, if (isWideReticle) "Wide Reticle (1D Barcodes)" else "Square Reticle (2D Matrix)", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(if (isWideReticle) LaserCyan.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.55f))
+                                .then(if (isWideReticle) Modifier.border(1.5.dp, LaserCyan, CircleShape) else Modifier)
+                                .testTag("wide_reticle_toggle_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Layers,
+                                contentDescription = "Toggle Wide Reticle (1D Barcodes)",
+                                tint = if (isWideReticle) LaserCyan else Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -750,7 +775,8 @@ fun ScannerScreen(
 fun ScannerOverlay(
     isScanningActive: Boolean,
     isDpmActive: Boolean = false,
-    isOcrActive: Boolean = false
+    isOcrActive: Boolean = false,
+    isWide: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "LaserAnimation")
     val laserProgress by infiniteTransition.animateFloat(
@@ -766,9 +792,12 @@ fun ScannerOverlay(
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        val boxSize = width * 0.72f
-        val left = (width - boxSize) / 2
-        val top = (height - boxSize) / 2.35f
+        
+        // Adaptive box geometry: Square (1:1) vs Wide (2.4:1 for 1D linear barcodes and PDF417)
+        val boxWidth = width * (if (isWide) 0.88f else 0.72f)
+        val boxHeight = if (isWide) boxWidth * 0.42f else boxWidth
+        val left = (width - boxWidth) / 2
+        val top = (height - boxHeight) / 2.35f
 
         // Darkened background framing mask
         drawRect(
@@ -779,16 +808,17 @@ fun ScannerOverlay(
         drawRect(
             color = Color.Transparent,
             topLeft = Offset(left, top),
-            size = Size(boxSize, boxSize),
+            size = Size(boxWidth, boxHeight),
             blendMode = BlendMode.Clear
         )
 
         // Accent Corners
-        val cornerLength = 36.dp.toPx()
+        val cornerLength = if (isWide) 28.dp.toPx() else 36.dp.toPx()
         val cornerThickness = 4.dp.toPx()
         val accentColor = when {
             isDpmActive -> Color(0xFF00F0FF) // Laser Cyan for DPM
             isOcrActive -> Color(0xFF818CF8) // Indigo for OCR
+            isWide -> Color(0xFF00F0FF)      // Laser Cyan for Wide Barcodes
             else -> Color(0xFF64B5F6)        // Standard Sky Blue
         }
 
@@ -797,25 +827,25 @@ fun ScannerOverlay(
         drawLine(accentColor, Offset(left, top), Offset(left, top + cornerLength), cornerThickness)
 
         // Top Right
-        drawLine(accentColor, Offset(left + boxSize, top), Offset(left + boxSize - cornerLength, top), cornerThickness)
-        drawLine(accentColor, Offset(left + boxSize, top), Offset(left + boxSize, top + cornerLength), cornerThickness)
+        drawLine(accentColor, Offset(left + boxWidth, top), Offset(left + boxWidth - cornerLength, top), cornerThickness)
+        drawLine(accentColor, Offset(left + boxWidth, top), Offset(left + boxWidth, top + cornerLength), cornerThickness)
 
         // Bottom Left
-        drawLine(accentColor, Offset(left, top + boxSize), Offset(left + cornerLength, top + boxSize), cornerThickness)
-        drawLine(accentColor, Offset(left, top + boxSize), Offset(left, top + boxSize - cornerLength), cornerThickness)
+        drawLine(accentColor, Offset(left, top + boxHeight), Offset(left + cornerLength, top + boxHeight), cornerThickness)
+        drawLine(accentColor, Offset(left, top + boxHeight), Offset(left, top + boxHeight - cornerLength), cornerThickness)
 
         // Bottom Right
-        drawLine(accentColor, Offset(left + boxSize, top + boxSize), Offset(left + boxSize - cornerLength, top + boxSize), cornerThickness)
-        drawLine(accentColor, Offset(left + boxSize, top + boxSize), Offset(left + boxSize, top + boxSize - cornerLength), cornerThickness)
+        drawLine(accentColor, Offset(left + boxWidth, top + boxHeight), Offset(left + boxWidth - cornerLength, top + boxHeight), cornerThickness)
+        drawLine(accentColor, Offset(left + boxWidth, top + boxHeight), Offset(left + boxWidth, top + boxHeight - cornerLength), cornerThickness)
 
         // Animated high-tech laser line
         if (isScanningActive) {
-            val laserY = top + (boxSize * laserProgress)
-            val laserColor = if (isDpmActive) Color(0xFF00F0FF) else if (isOcrActive) Color(0xFF818CF8) else Color(0xFF00E5FF)
+            val laserY = top + (boxHeight * laserProgress)
+            val laserColor = if (isDpmActive || isWide) Color(0xFF00F0FF) else if (isOcrActive) Color(0xFF818CF8) else Color(0xFF00E5FF)
             drawLine(
                 color = laserColor.copy(alpha = 0.9f),
                 start = Offset(left + 8.dp.toPx(), laserY),
-                end = Offset(left + boxSize - 8.dp.toPx(), laserY),
+                end = Offset(left + boxWidth - 8.dp.toPx(), laserY),
                 strokeWidth = 2.5.dp.toPx()
             )
         }
