@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: ScanRepository
     val history: StateFlow<List<ScanResult>>
+    val favorites: StateFlow<List<ScanResult>>
 
     private val _lastScan = MutableStateFlow<ScanResult?>(null)
     val lastScan: StateFlow<ScanResult?> = _lastScan.asStateFlow()
@@ -31,6 +32,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+        favorites = repository.favoriteScans.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
     }
 
     /**
@@ -38,14 +44,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Throttles identical scans and ignores scans while a result dialog is already open.
      * Returns true if the scan was accepted, false if throttled.
      */
-    fun onScanResult(content: String, format: Int, type: Int): Boolean {
+    fun onScanResult(content: String, format: Int, type: Int, ignoreThrottle: Boolean = false): Boolean {
         // If a scan is currently being displayed, do not accept new scans
-        if (_lastScan.value != null) {
+        if (_lastScan.value != null && !ignoreThrottle) {
             return false
         }
 
         val now = System.currentTimeMillis()
-        if (content == lastScannedContent && (now - lastScannedTimestamp) < 2000L) {
+        if (!ignoreThrottle && content == lastScannedContent && (now - lastScannedTimestamp) < 2000L) {
             return false
         }
 
@@ -58,6 +64,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.insert(scan)
         }
         return true
+    }
+
+    fun toggleFavorite(scan: ScanResult) {
+        viewModelScope.launch {
+            val updated = !scan.isFavorite
+            repository.updateFavorite(scan.id, updated)
+            if (_lastScan.value?.id == scan.id) {
+                _lastScan.value = _lastScan.value?.copy(isFavorite = updated)
+            }
+        }
+    }
+
+    fun updateNote(scan: ScanResult, note: String?) {
+        viewModelScope.launch {
+            repository.updateNote(scan.id, note)
+            if (_lastScan.value?.id == scan.id) {
+                _lastScan.value = _lastScan.value?.copy(note = note)
+            }
+        }
     }
 
     fun deleteScan(scan: ScanResult) {

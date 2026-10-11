@@ -10,10 +10,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
@@ -29,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.ScanResult
 import com.example.ui.MainViewModel
 import com.example.ui.components.ScanResultSheet
+import com.example.ui.theme.AlertCrimson
 import com.example.util.ScanUtils
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.text.SimpleDateFormat
@@ -36,6 +40,7 @@ import java.util.*
 
 enum class HistoryFilter(val label: String) {
     ALL("All"),
+    FAVORITES("Favorites"),
     URLS("Links"),
     WIFI("Wi-Fi"),
     TEXT("Text")
@@ -54,6 +59,7 @@ fun HistoryScreen(
     var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
     var selectedScan by remember { mutableStateOf<ScanResult?>(null) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     // Filtered list based on search and selected filter chip
     val filteredHistory = remember(history, searchQuery, selectedFilter) {
@@ -64,6 +70,7 @@ fun HistoryScreen(
 
             val matchesFilter = when (selectedFilter) {
                 HistoryFilter.ALL -> true
+                HistoryFilter.FAVORITES -> scan.isFavorite
                 HistoryFilter.URLS -> scan.type == Barcode.TYPE_URL || scan.content.startsWith("http://") || scan.content.startsWith("https://")
                 HistoryFilter.WIFI -> scan.type == Barcode.TYPE_WIFI || scan.content.startsWith("WIFI:")
                 HistoryFilter.TEXT -> scan.type == Barcode.TYPE_TEXT || (!scan.content.startsWith("http") && !scan.content.startsWith("WIFI:"))
@@ -98,22 +105,19 @@ fun HistoryScreen(
                 },
                 actions = {
                     if (history.isNotEmpty()) {
-                        // Export CSV / Share All button
+                        // Export Dialog Launcher (CSV or JSON)
                         IconButton(
-                            onClick = {
-                                val csv = ScanUtils.exportHistoryAsCsv(history)
-                                ScanUtils.shareText(context, csv)
-                            },
+                            onClick = { showExportDialog = true },
                             modifier = Modifier.testTag("export_history_button")
                         ) {
                             Icon(
                                 Icons.Default.FileUpload,
-                                contentDescription = "Export History to CSV",
+                                contentDescription = "Export History",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
 
-                        // Clear All button
+                        // Clear All History button
                         IconButton(
                             onClick = { showClearDialog = true },
                             modifier = Modifier.testTag("clear_history_button")
@@ -128,41 +132,41 @@ fun HistoryScreen(
                 }
             )
         }
-    ) { padding ->
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(innerPadding)
         ) {
+            // Search Input Field
             if (history.isNotEmpty()) {
-                // Search Input Field
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search scanned items...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .testTag("history_search_field"),
+                    placeholder = { Text("Search scanned codes...") },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
                             }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .testTag("history_search_input")
+                    shape = RoundedCornerShape(14.dp)
                 )
 
                 // Filter Category Chips
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     HistoryFilter.entries.forEach { filter ->
@@ -170,8 +174,7 @@ fun HistoryScreen(
                             selected = selectedFilter == filter,
                             onClick = { selectedFilter = filter },
                             label = { Text(filter.label) },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("filter_chip_${filter.name.lowercase()}")
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }
@@ -216,6 +219,7 @@ fun HistoryScreen(
                     items(filteredHistory, key = { it.id }) { scan ->
                         HistoryItem(
                             scan = scan,
+                            onToggleFavorite = { viewModel.toggleFavorite(scan) },
                             onDelete = { viewModel.deleteScan(scan) },
                             onClick = { selectedScan = scan }
                         )
@@ -229,7 +233,41 @@ fun HistoryScreen(
     selectedScan?.let { scan ->
         ScanResultSheet(
             scanResult = scan,
-            onDismiss = { selectedScan = null }
+            onDismiss = { selectedScan = null },
+            onToggleFavorite = { viewModel.toggleFavorite(it) }
+        )
+    }
+
+    // Export Format Selection Dialog
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Export History", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Select your preferred export format for ${filteredHistory.size} scan records:")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val csv = ScanUtils.exportHistoryAsCsv(filteredHistory)
+                        ScanUtils.shareText(context, csv, "Share Scanned History (CSV)")
+                        showExportDialog = false
+                    }
+                ) {
+                    Text("Export CSV")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        val json = ScanUtils.exportHistoryAsJson(filteredHistory)
+                        ScanUtils.shareText(context, json, "Share Scanned History (JSON)")
+                        showExportDialog = false
+                    }
+                ) {
+                    Text("Export JSON")
+                }
+            }
         )
     }
 
@@ -261,6 +299,7 @@ fun HistoryScreen(
 @Composable
 fun HistoryItem(
     scan: ScanResult,
+    onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -286,7 +325,7 @@ fun HistoryItem(
     ) {
         Row(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(14.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -300,12 +339,12 @@ fun HistoryItem(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -330,13 +369,26 @@ fun HistoryItem(
             }
 
             IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (scan.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Toggle Favorite",
+                    tint = if (scan.isFavorite) AlertCrimson else MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            IconButton(
                 onClick = onDelete,
-                modifier = Modifier.testTag("delete_item_${scan.id}")
+                modifier = Modifier.size(36.dp).testTag("delete_item_${scan.id}")
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Item",
-                    tint = MaterialTheme.colorScheme.outline
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

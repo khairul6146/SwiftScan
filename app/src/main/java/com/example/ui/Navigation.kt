@@ -9,9 +9,9 @@ import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.ScannerScreen
 
 sealed class Screen(val route: String) {
-    object Scanner : Screen("scanner")
-    object History : Screen("history")
-    object Generate : Screen("generate")
+    data object Scanner : Screen("scanner")
+    data object History : Screen("history")
+    data object Generate : Screen("generate")
 }
 
 @Composable

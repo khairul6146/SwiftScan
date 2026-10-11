@@ -62,7 +62,19 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        it.testLogging {
+          events("passed", "skipped", "failed", "standardOut", "standardError")
+        }
+      }
+    }
+  }
+  tasks.withType<Test>().configureEach {
+    failOnNoDiscoveredTests = false
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -90,6 +102,7 @@ dependencies {
   implementation(libs.androidx.camera.view)
   implementation(libs.androidx.camera.mlkit.vision)
   implementation(libs.google.mlkit.barcode.scanning)
+  implementation(libs.google.mlkit.text.recognition)
   implementation(libs.zxing.core)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)

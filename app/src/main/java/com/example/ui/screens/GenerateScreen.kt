@@ -10,12 +10,16 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Language
@@ -45,8 +49,19 @@ enum class QrType(val label: String) {
     TEXT("Text"),
     URL("Website"),
     WIFI("Wi-Fi"),
-    PHONE("Phone")
+    PHONE("Phone"),
+    CONTACT("vCard")
 }
+
+data class QrPalette(val name: String, val colorInt: Int, val composeColor: Color)
+
+val PRESET_PALETTES = listOf(
+    QrPalette("Black", android.graphics.Color.BLACK, Color(0xFF000000)),
+    QrPalette("Laser Cyan", android.graphics.Color.parseColor("#00838F"), Color(0xFF00838F)),
+    QrPalette("Indigo", android.graphics.Color.parseColor("#3730A3"), Color(0xFF3730A3)),
+    QrPalette("Emerald", android.graphics.Color.parseColor("#065F46"), Color(0xFF065F46)),
+    QrPalette("Crimson", android.graphics.Color.parseColor("#991B1B"), Color(0xFF991B1B))
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,18 +71,30 @@ fun GenerateScreen(
     val context = LocalContext.current
 
     var selectedType by remember { mutableStateOf(QrType.TEXT) }
+    var selectedPalette by remember { mutableStateOf(PRESET_PALETTES[0]) }
+
     var textInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
     var wifiSsid by remember { mutableStateOf("") }
     var wifiPassword by remember { mutableStateOf("") }
     var phoneInput by remember { mutableStateOf("") }
 
-    val rawContentToEncode = remember(selectedType, textInput, urlInput, wifiSsid, wifiPassword, phoneInput) {
+    // vCard inputs
+    var contactName by remember { mutableStateOf("") }
+    var contactPhone by remember { mutableStateOf("") }
+    var contactEmail by remember { mutableStateOf("") }
+
+    val rawContentToEncode = remember(
+        selectedType, textInput, urlInput, wifiSsid, wifiPassword,
+        phoneInput, contactName, contactPhone, contactEmail
+    ) {
         when (selectedType) {
             QrType.TEXT -> textInput
             QrType.URL -> {
                 if (urlInput.isNotBlank()) {
-                    if (!urlInput.startsWith("http://") && !urlInput.startsWith("https://")) {
+                    if (!urlInput.startsWith("http://", ignoreCase = true) &&
+                        !urlInput.startsWith("https://", ignoreCase = true)
+                    ) {
                         "https://$urlInput"
                     } else urlInput
                 } else ""
@@ -80,13 +107,22 @@ fun GenerateScreen(
             QrType.PHONE -> {
                 if (phoneInput.isNotBlank()) "tel:$phoneInput" else ""
             }
+            QrType.CONTACT -> {
+                if (contactName.isNotBlank() || contactPhone.isNotBlank()) {
+                    "BEGIN:VCARD\nVERSION:3.0\nFN:$contactName\nTEL:$contactPhone\nEMAIL:$contactEmail\nEND:VCARD"
+                } else ""
+            }
         }
     }
 
-    val qrBitmap by remember(rawContentToEncode) {
+    val qrBitmap by remember(rawContentToEncode, selectedPalette) {
         derivedStateOf {
             if (rawContentToEncode.isNotBlank()) {
-                QrGenerator.generateQrCode(rawContentToEncode, 600)
+                QrGenerator.generateQrCode(
+                    text = rawContentToEncode,
+                    size = 600,
+                    foregroundColor = selectedPalette.colorInt
+                )
             } else null
         }
     }
@@ -110,28 +146,29 @@ fun GenerateScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Type Selector Chips
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 QrType.entries.forEach { type ->
                     val isSelected = selectedType == type
                     FilterChip(
                         selected = isSelected,
                         onClick = { selectedType = type },
-                        label = { Text(type.label) },
+                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
                         leadingIcon = {
                             val icon = when (type) {
                                 QrType.TEXT -> Icons.Default.TextFields
                                 QrType.URL -> Icons.Default.Language
                                 QrType.WIFI -> Icons.Default.Wifi
                                 QrType.PHONE -> Icons.Default.Phone
+                                QrType.CONTACT -> Icons.Default.ContactPage
                             }
                             Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
@@ -148,7 +185,7 @@ fun GenerateScreen(
                         value = textInput,
                         onValueChange = { textInput = it },
                         label = { Text("Enter plain text") },
-                        placeholder = { Text("e.g. Note, message, or ID") },
+                        placeholder = { Text("e.g. Note, message, or asset ID") },
                         modifier = Modifier.fillMaxWidth().testTag("input_text"),
                         shape = RoundedCornerShape(14.dp),
                         minLines = 2,
@@ -182,7 +219,7 @@ fun GenerateScreen(
                         OutlinedTextField(
                             value = wifiPassword,
                             onValueChange = { wifiPassword = it },
-                            label = { Text("Password (optional)") },
+                            label = { Text("Password (leave blank if open)") },
                             modifier = Modifier.fillMaxWidth().testTag("input_wifi_password"),
                             shape = RoundedCornerShape(14.dp),
                             singleLine = true
@@ -199,6 +236,67 @@ fun GenerateScreen(
                         shape = RoundedCornerShape(14.dp),
                         singleLine = true
                     )
+                }
+                QrType.CONTACT -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = contactName,
+                            onValueChange = { contactName = it },
+                            label = { Text("Full Name") },
+                            modifier = Modifier.fillMaxWidth().testTag("input_contact_name"),
+                            shape = RoundedCornerShape(14.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = contactPhone,
+                            onValueChange = { contactPhone = it },
+                            label = { Text("Phone Number") },
+                            modifier = Modifier.fillMaxWidth().testTag("input_contact_phone"),
+                            shape = RoundedCornerShape(14.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = contactEmail,
+                            onValueChange = { contactEmail = it },
+                            label = { Text("Email Address") },
+                            modifier = Modifier.fillMaxWidth().testTag("input_contact_email"),
+                            shape = RoundedCornerShape(14.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+            }
+
+            // Palette Theme Color Picker
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "QR Code Color:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PRESET_PALETTES.forEach { palette ->
+                        val isSelected = selectedPalette == palette
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(palette.composeColor)
+                                .clickable { selectedPalette = palette }
+                                .then(
+                                    if (isSelected) Modifier.border(2.dp, Color.White, CircleShape)
+                                    else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {}
+                    }
                 }
             }
 
@@ -238,119 +336,132 @@ fun GenerateScreen(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Language,
+                                imageVector = Icons.Default.TextFields,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.outline
                             )
                             Text(
-                                text = "Enter details above to preview QR code",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Preview will appear here",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }
                 }
             }
 
-            // Action Buttons
+            // Action Buttons: Save & Share
             if (qrBitmap != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Copy text button
-                    OutlinedButton(
-                        onClick = {
-                            ScanUtils.copyToClipboard(context, rawContentToEncode)
-                        },
-                        modifier = Modifier.weight(1f).height(48.dp).testTag("copy_generated_button"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Copy")
-                    }
-
-                    // Share button
                     Button(
                         onClick = {
-                            shareGeneratedQr(context, qrBitmap!!, rawContentToEncode)
+                            val highRes = QrGenerator.generateQrCode(
+                                text = rawContentToEncode,
+                                size = 1024,
+                                foregroundColor = selectedPalette.colorInt
+                            ) ?: qrBitmap!!
+                            saveQrCodeToGallery(context, highRes)
                         },
-                        modifier = Modifier.weight(1f).height(48.dp).testTag("share_generated_button"),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("save_qr_button"),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Share")
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Save",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save HD")
                     }
 
-                    // Save to Gallery button
-                    FilledTonalButton(
+                    OutlinedButton(
                         onClick = {
-                            saveBitmapToGallery(context, qrBitmap!!)
+                            shareQrCodeImage(context, qrBitmap!!)
                         },
-                        modifier = Modifier.weight(1f).height(48.dp).testTag("save_generated_button"),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("share_qr_button"),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Save")
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Share")
                     }
+                }
+
+                // Copy Payload
+                TextButton(
+                    onClick = {
+                        ScanUtils.copyToClipboard(context, rawContentToEncode)
+                    },
+                    modifier = Modifier.testTag("copy_payload_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy Raw Text")
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
-/**
- * Saves generated QR code bitmap to Android MediaStore Pictures directory.
- */
-private fun saveBitmapToGallery(context: Context, bitmap: Bitmap) {
+private fun saveQrCodeToGallery(context: Context, bitmap: Bitmap) {
     try {
-        val filename = "QRCode_${System.currentTimeMillis()}.png"
-        var outputStream: OutputStream? = null
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val filename = "SwiftScan_QR_${System.currentTimeMillis()}.png"
+        val fos: OutputStream? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
                 put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/SwiftScan")
             }
             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-            if (uri != null) {
-                outputStream = context.contentResolver.openOutputStream(uri)
-            }
+            uri?.let { context.contentResolver.openOutputStream(it) }
         } else {
-            val imagesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString()
-            val image = File(imagesDir, filename)
-            outputStream = FileOutputStream(image)
+            val imagesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString() + "/SwiftScan"
+            val file = File(imagesDir)
+            if (!file.exists()) file.mkdirs()
+            val image = File(file, filename)
+            FileOutputStream(image)
         }
 
-        outputStream?.use {
+        fos?.use {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-            Toast.makeText(context, "QR code saved to Pictures!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Saved HD QR Code to Gallery", Toast.LENGTH_SHORT).show()
         } ?: run {
-            Toast.makeText(context, "Failed to save QR code", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Failed to save image", Toast.LENGTH_SHORT).show()
         }
     } catch (e: Exception) {
-        Toast.makeText(context, "Could not save image: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        e.printStackTrace()
+        Toast.makeText(context, "Error saving QR Code", Toast.LENGTH_SHORT).show()
     }
 }
 
-/**
- * Shares the generated QR code image file via Android system share sheet.
- */
-private fun shareGeneratedQr(context: Context, bitmap: Bitmap, content: String) {
+private fun shareQrCodeImage(context: Context, bitmap: Bitmap) {
     try {
         val cachePath = File(context.cacheDir, "images")
         cachePath.mkdirs()
-        val file = File(cachePath, "qr_code.png")
-        val stream = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        stream.close()
+        val file = File(cachePath, "swiftscan_share.png")
+        val fileOutputStream = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
+        fileOutputStream.close()
 
         val contentUri = FileProvider.getUriForFile(
             context,
@@ -361,12 +472,11 @@ private fun shareGeneratedQr(context: Context, bitmap: Bitmap, content: String) 
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, contentUri)
-            putExtra(Intent.EXTRA_TEXT, content)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "Share QR Code"))
-    } catch (_: Exception) {
-        // Fallback to text sharing if FileProvider fails
-        ScanUtils.shareText(context, content)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        Toast.makeText(context, "Failed to share QR image", Toast.LENGTH_SHORT).show()
     }
 }

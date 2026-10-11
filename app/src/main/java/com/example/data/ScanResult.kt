@@ -9,5 +9,7 @@ data class ScanResult(
     val content: String,
     val format: Int,
     val timestamp: Long = System.currentTimeMillis(),
-    val type: Int // Barcode.TYPE_URL, Barcode.TYPE_TEXT, etc.
+    val type: Int, // Barcode.TYPE_URL, Barcode.TYPE_TEXT, etc.
+    val isFavorite: Boolean = false,
+    val note: String? = null
 )
