@@ -11,54 +11,55 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+// Titanium & Cobalt Dark Palette
 private val DarkColorScheme = darkColorScheme(
-    primary = LaserCyan,
-    onPrimary = Color(0xFF00363D),
-    primaryContainer = Color(0xFF004E57),
-    onPrimaryContainer = Color(0xFF80F5FF),
-    secondary = ElectricIndigo,
-    onSecondary = Color(0xFF1E1B4B),
-    secondaryContainer = Color(0xFF312E81),
-    onSecondaryContainer = Color(0xFFC7D2FE),
-    tertiary = SafeEmerald,
-    onTertiary = Color(0xFF064E3B),
-    tertiaryContainer = Color(0xFF065F46),
+    primary = PrimaryCobalt,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF1E3A8A),
+    onPrimaryContainer = Color(0xFFDBEAFE),
+    secondary = Color(0xFF64748B),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF1E293B),
+    onSecondaryContainer = Color(0xFFE2E8F0),
+    tertiary = StatusEmerald,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFF064E3B),
     onTertiaryContainer = Color(0xFFA7F3D0),
-    background = ObsidianBase,
-    onBackground = TextPrimary,
-    surface = SurfaceElevated,
-    onSurface = TextPrimary,
-    surfaceVariant = SurfaceElevatedHigh,
-    onSurfaceVariant = TextMuted,
-    outline = DarkBorder
+    background = VoidCanvas,
+    onBackground = TextHighEmphasis,
+    surface = SurfaceSlate,
+    onSurface = TextHighEmphasis,
+    surfaceVariant = SurfaceElevated,
+    onSurfaceVariant = TextMediumEmphasis,
+    outline = HairlineBorder
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0284C7),
+    primary = PrimaryCobalt,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE0F2FE),
-    onPrimaryContainer = Color(0xFF0369A1),
-    secondary = Color(0xFF4F46E5),
+    primaryContainer = Color(0xFFDBEAFE),
+    onPrimaryContainer = Color(0xFF1E3A8A),
+    secondary = Color(0xFF475569),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFEEF2FF),
-    onSecondaryContainer = Color(0xFF3730A3),
-    tertiary = Color(0xFF059669),
+    secondaryContainer = Color(0xFFF1F5F9),
+    onSecondaryContainer = Color(0xFF0F172A),
+    tertiary = StatusEmerald,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFECFDF5),
-    onTertiaryContainer = Color(0xFF047857),
+    tertiaryContainer = Color(0xFFD1FAE5),
+    onTertiaryContainer = Color(0xFF065F46),
     background = Color(0xFFF8FAFC),
     onBackground = Color(0xFF0F172A),
     surface = Color.White,
     onSurface = Color(0xFF0F172A),
     surfaceVariant = Color(0xFFF1F5F9),
     onSurfaceVariant = Color(0xFF475569),
-    outline = Color(0xFFE2E8F0)
+    outline = Color(0xFFCBD5E1)
 )
 
 @Composable
 fun SwiftScanTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Keep consistent branding by default
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
@@ -67,7 +68,7 @@ fun SwiftScanTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColorScheme
-        else -> DarkColorScheme // Viewfinder apps excel with high-contrast dark theme by default
+        else -> DarkColorScheme // Optical viewfinders excel with high-contrast dark palette by default
     }
 
     MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
