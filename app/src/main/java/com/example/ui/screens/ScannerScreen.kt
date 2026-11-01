@@ -1,8 +1,10 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -13,12 +15,10 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,41 +26,35 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FlashOff
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.ui.MainViewModel
+import com.example.ui.components.LaserReticleHUD
 import com.example.ui.components.ScanResultSheet
-import com.example.ui.theme.LaserCyan
-import com.example.ui.theme.SafeEmerald
+import com.example.ui.components.TurboActionPill
+import com.example.ui.theme.*
 import com.example.util.DpmImageProcessor
 import com.example.util.OcrUtils
+import com.example.util.PayloadCategory
+import com.example.util.PayloadParser
 import com.example.util.ScanUtils
 import com.example.util.SoundUtils
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -94,8 +88,9 @@ fun ScannerScreen(
     val isBatchMode = scanMode == ScanMode.BATCH
     val isOcrMode = scanMode == ScanMode.OCR
 
-    var isDpmMode by remember { mutableStateOf(false) } // Direct Part Marking / High-Contrast mode
-    var isWideReticle by remember { mutableStateOf(false) } // Wide framing for 1D & PDF417
+    var isAutoCopyActive by remember { mutableStateOf(false) }
+    var showDetailedSheet by remember { mutableStateOf(false) }
+
     var batchCount by remember { mutableIntStateOf(0) }
     var batchBannerText by remember { mutableStateOf<String?>(null) }
     val batchScannedSet = remember { mutableSetOf<String>() }
@@ -167,6 +162,9 @@ fun ScannerScreen(
                                 )
                                 ScanUtils.triggerHapticFeedback(context)
                                 if (soundEnabled) SoundUtils.playBeep()
+                                if (isAutoCopyActive) {
+                                    ScanUtils.copyToClipboard(context, target)
+                                }
                             } else {
                                 Toast.makeText(context, "No readable text found in image", Toast.LENGTH_SHORT).show()
                             }
@@ -190,6 +188,9 @@ fun ScannerScreen(
                                     if (accepted) {
                                         ScanUtils.triggerHapticFeedback(context)
                                         if (soundEnabled) SoundUtils.playBeep()
+                                        if (isAutoCopyActive) {
+                                            ScanUtils.copyToClipboard(context, content)
+                                        }
                                         if (isBatchMode) {
                                             batchScannedSet.add(content)
                                             batchCount++
@@ -198,37 +199,8 @@ fun ScannerScreen(
                                         }
                                     }
                                 }
-                            } else if (isDpmMode) {
-                                // Try DPM Inverted pass on gallery image
-                                try {
-                                    val inputStream = context.contentResolver.openInputStream(uri)
-                                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                                    inputStream?.close()
-                                    if (bitmap != null) {
-                                        val enhanced = DpmImageProcessor.enhanceDpmBitmap(
-                                            DpmImageProcessor.invertBitmap(bitmap)
-                                        )
-                                        val dpmInputImage = InputImage.fromBitmap(enhanced, 0)
-                                        barcodeScanner.process(dpmInputImage)
-                                            .addOnSuccessListener { dpmBarcodes ->
-                                                if (!dpmBarcodes.isNullOrEmpty()) {
-                                                    val barcode = dpmBarcodes.first()
-                                                    val content = barcode.rawValue
-                                                    if (!content.isNullOrBlank()) {
-                                                        viewModel.onScanResult(content, barcode.format, barcode.valueType)
-                                                        ScanUtils.triggerHapticFeedback(context)
-                                                        if (soundEnabled) SoundUtils.playBeep()
-                                                    }
-                                                } else {
-                                                    Toast.makeText(context, "No code found even with DPM enhancement", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                    }
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "No barcode found in image", Toast.LENGTH_SHORT).show()
-                                }
                             } else {
-                                Toast.makeText(context, "No barcode found. Try DPM Mode or OCR.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "No barcode found in image", Toast.LENGTH_SHORT).show()
                             }
                         }
                         .addOnFailureListener {
@@ -249,8 +221,6 @@ fun ScannerScreen(
         }
     }
 
-    var lastAnalysisTime = remember { 0L }
-
     if (hasCameraPermission) {
         val cameraController = remember {
             LifecycleCameraController(context).apply {
@@ -261,8 +231,7 @@ fun ScannerScreen(
             }
         }
 
-        // Fix Bug 1: Camera controller lifecycle binding happens ONCE per lens change,
-        // avoiding flickering restarts when lastScan bottom sheet toggles
+        // Camera controller lifecycle binding happens ONCE per lens change
         LaunchedEffect(cameraController, isBackCamera) {
             try {
                 cameraController.cameraSelector = if (isBackCamera) {
@@ -276,27 +245,26 @@ fun ScannerScreen(
             }
         }
 
-        // Configure Dual Barcode + OCR Analyzer
-        // Note: Kept permanently bound across scan events (lastScan detached from keys)
-        // so CameraX frame pipeline never drops buffers or stalls upon sheet dismissal!
-        LaunchedEffect(cameraController, scanMode, isDpmMode) {
+        // Decoupled OCR vs Barcode Analyzer: No arbitrary delay bottleneck
+        LaunchedEffect(cameraController, scanMode) {
+            val detectorList = if (scanMode == ScanMode.OCR) {
+                listOf(textRecognizer)
+            } else {
+                listOf(barcodeScanner)
+            }
+
+            @Suppress("DEPRECATION")
             cameraController.setImageAnalysisAnalyzer(
                 analysisExecutor,
                 MlKitAnalyzer(
-                    listOf(barcodeScanner, textRecognizer),
+                    detectorList,
                     CameraController.COORDINATE_SYSTEM_VIEW_REFERENCED,
                     analysisExecutor
                 ) { result ->
-                    // In single-mode, pause if result sheet is currently open
+                    // In single-mode, pause if result is currently active on screen
                     if (scanMode == ScanMode.SINGLE && viewModel.lastScan.value != null) return@MlKitAnalyzer
 
-                    val now = System.currentTimeMillis()
-                    // Throttle frame processing to 180ms for ultra-responsive decoding
-                    if (now - lastAnalysisTime < 180L) return@MlKitAnalyzer
-                    lastAnalysisTime = now
-
                     if (scanMode == ScanMode.OCR) {
-                        // OCR MODE: Analyze text lines
                         val visionText = result.getValue(textRecognizer)
                         if (visionText != null && visionText.text.isNotBlank()) {
                             val ocrResult = OcrUtils.parseOcrText(visionText.text)
@@ -310,11 +278,13 @@ fun ScannerScreen(
                                 if (accepted) {
                                     ScanUtils.triggerHapticFeedback(context)
                                     if (soundEnabled) SoundUtils.playBeep()
+                                    if (isAutoCopyActive) {
+                                        ScanUtils.copyToClipboard(context, target)
+                                    }
                                 }
                             }
                         }
                     } else {
-                        // BARCODE / 2D / DPM MODE
                         val barcodes = result.getValue(barcodeScanner)
                         if (!barcodes.isNullOrEmpty()) {
                             val barcode = barcodes.first()
@@ -333,6 +303,9 @@ fun ScannerScreen(
                                 if (accepted) {
                                     ScanUtils.triggerHapticFeedback(context)
                                     if (soundEnabled) SoundUtils.playBeep()
+                                    if (isAutoCopyActive) {
+                                        ScanUtils.copyToClipboard(context, content)
+                                    }
 
                                     if (isBatchMode) {
                                         batchScannedSet.add(content)
@@ -348,8 +321,16 @@ fun ScannerScreen(
             )
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Live Camera Preview
+        val torchState by cameraController.torchState.observeAsState(initial = 0)
+        val zoomState by cameraController.zoomState.observeAsState()
+        val currentZoomRatio = zoomState?.zoomRatio ?: 1f
+
+        val parsedPayload = remember(lastScan) {
+            lastScan?.let { PayloadParser.parse(it) }
+        }
+
+        Box(modifier = Modifier.fillMaxSize().background(VoidCanvas)) {
+            // Live Camera Viewport
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
@@ -359,130 +340,225 @@ fun ScannerScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Animated Laser Viewfinder Overlay
-            ScannerOverlay(
-                isScanningActive = isBatchMode || lastScan == null,
-                isDpmActive = isDpmMode,
-                isOcrActive = isOcrMode,
-                isWide = isWideReticle
+            // Precision Optical Reticle HUD (Replacing Slop Animated Overlay)
+            LaserReticleHUD(
+                isLocked = lastScan != null,
+                lockElapsedMs = null,
+                isTorchOn = torchState == 1 && isBackCamera,
+                isAutoCopyActive = isAutoCopyActive,
+                soundEnabled = soundEnabled,
+                onToggleTorch = {
+                    if (isBackCamera) {
+                        try {
+                            cameraController.enableTorch(torchState != 1)
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "Flashlight unavailable", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Flashlight unavailable on front camera", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onSwitchCamera = {
+                    isBackCamera = !isBackCamera
+                },
+                onToggleAutoCopy = {
+                    isAutoCopyActive = !isAutoCopyActive
+                    Toast.makeText(context, if (isAutoCopyActive) "Auto-Copy ON" else "Auto-Copy OFF", Toast.LENGTH_SHORT).show()
+                },
+                onToggleSound = {
+                    soundEnabled = !soundEnabled
+                    Toast.makeText(context, if (soundEnabled) "Audio ON" else "Audio MUTED", Toast.LENGTH_SHORT).show()
+                },
+                onPickGallery = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
             )
 
-            // TOP BAR: Quick Action Controls
-            val torchState by cameraController.torchState.observeAsState(initial = 0)
-
-            Column(
+            // Status Banner in Batch Mode
+            AnimatedVisibility(
+                visible = batchBannerText != null,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(top = 70.dp, start = 16.dp, end = 16.dp)
             ) {
-                // Header icons: Torch, DPM Filter, Sound, Lens Flip, Mode Pill
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceElevated,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = StatusEmerald,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = batchBannerText ?: "",
+                            color = TextHighEmphasis,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Bottom Cluster: Reticle Controls, Turbo Action Pill & Navigation
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Non-Blocking Turbo Action Pill (Concentric 20dp card)
+                if (!isBatchMode && parsedPayload != null) {
+                    TurboActionPill(
+                        payload = parsedPayload,
+                        visible = lastScan != null,
+                        onPrimaryAction = {
+                            when (parsedPayload.category) {
+                                PayloadCategory.URL -> {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(parsedPayload.cleanedContent))
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                    }
+                                }
+                                PayloadCategory.WIFI -> {
+                                    ScanUtils.openWifiSettings(context, parsedPayload.rawContent)
+                                }
+                                PayloadCategory.PRODUCT -> {
+                                    try {
+                                        val searchUri = Uri.parse("https://www.google.com/search?q=${Uri.encode(parsedPayload.cleanedContent)}")
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, searchUri))
+                                    } catch (_: Exception) {
+                                        ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                    }
+                                }
+                                PayloadCategory.CONTACT -> {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_INSERT).apply {
+                                            type = android.provider.ContactsContract.Contacts.CONTENT_TYPE
+                                            putExtra(android.provider.ContactsContract.Intents.Insert.NAME, parsedPayload.contactName ?: "")
+                                            putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, parsedPayload.contactPhone ?: "")
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        ScanUtils.copyToClipboard(context, parsedPayload.rawContent)
+                                    }
+                                }
+                                PayloadCategory.TEXT -> {
+                                    ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                }
+                            }
+                        },
+                        onSecondaryAction = {
+                            when (parsedPayload.category) {
+                                PayloadCategory.URL -> ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                PayloadCategory.WIFI -> ScanUtils.copyToClipboard(context, parsedPayload.wifiPassword ?: parsedPayload.wifiSsid ?: parsedPayload.rawContent)
+                                PayloadCategory.PRODUCT -> ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                PayloadCategory.CONTACT -> {
+                                    if (parsedPayload.contactPhone != null) {
+                                        try {
+                                            val dial = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${parsedPayload.contactPhone}"))
+                                            context.startActivity(dial)
+                                        } catch (_: Exception) {
+                                            ScanUtils.copyToClipboard(context, parsedPayload.contactPhone)
+                                        }
+                                    } else {
+                                        ScanUtils.copyToClipboard(context, parsedPayload.rawContent)
+                                    }
+                                }
+                                PayloadCategory.TEXT -> {
+                                    try {
+                                        val searchUri = Uri.parse("https://www.google.com/search?q=${Uri.encode(parsedPayload.cleanedContent)}")
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, searchUri))
+                                    } catch (_: Exception) {
+                                        ScanUtils.copyToClipboard(context, parsedPayload.cleanedContent)
+                                    }
+                                }
+                            }
+                        },
+                        onOpenDetails = {
+                            showDetailedSheet = true
+                        },
+                        onDismiss = {
+                            viewModel.clearLastScan()
+                        }
+                    )
+                }
+
+                // Controls row: Zoom Pill (1x, 2x, 3x) & Mode Selector Pill
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left cluster: Flashlight, Sound, DPM & Wide-Reticle Toggle
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Flashlight toggle
-                        IconButton(
-                            onClick = {
-                                if (isBackCamera) {
-                                    try {
-                                        cameraController.enableTorch(torchState != 1)
-                                    } catch (_: Exception) {
-                                        Toast.makeText(context, "Flashlight unavailable", Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    Toast.makeText(context, "Flashlight unavailable on front camera", Toast.LENGTH_SHORT).show()
+                    // Zoom selector pill
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = SurfaceSlate,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                        modifier = Modifier.testTag("zoom_selector_pill")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(1.0f, 2.0f, 3.0f).forEach { zoomLevel ->
+                                val isSelected = (currentZoomRatio - zoomLevel).let { kotlin.math.abs(it) < 0.25f }
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) PrimaryCobalt else Color.Transparent)
+                                        .clickable {
+                                            try {
+                                                cameraController.setZoomRatio(zoomLevel)
+                                            } catch (_: Exception) {}
+                                        }
+                                        .testTag("zoom_button_${zoomLevel.toInt()}x"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${zoomLevel.toInt()}x",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else TextMediumEmphasis
+                                    )
                                 }
-                            },
-                            enabled = isBackCamera,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .testTag("flash_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = if (torchState == 1 && isBackCamera) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                contentDescription = "Toggle Flashlight",
-                                tint = if (torchState == 1 && isBackCamera) Color(0xFFFFD54F) else if (isBackCamera) Color.White else Color.Gray,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Sound Beep toggle (AutoMirrored deprecation fix)
-                        IconButton(
-                            onClick = {
-                                soundEnabled = !soundEnabled
-                                Toast.makeText(context, if (soundEnabled) "Audio beep ON" else "Audio MUTED", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .testTag("sound_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = if (soundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                                contentDescription = "Toggle Audio Feedback",
-                                tint = if (soundEnabled) SafeEmerald else Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Wide-Reticle (1D / PDF417) toggle
-                        IconButton(
-                            onClick = {
-                                isWideReticle = !isWideReticle
-                                Toast.makeText(context, if (isWideReticle) "Wide Reticle (1D Barcodes)" else "Square Reticle (2D Matrix)", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(if (isWideReticle) LaserCyan.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.55f))
-                                .then(if (isWideReticle) Modifier.border(1.5.dp, LaserCyan, CircleShape) else Modifier)
-                                .testTag("wide_reticle_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Layers,
-                                contentDescription = "Toggle Wide Reticle (1D Barcodes)",
-                                tint = if (isWideReticle) LaserCyan else Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // DPM / Industrial Filter toggle
-                        IconButton(
-                            onClick = {
-                                isDpmMode = !isDpmMode
-                                Toast.makeText(context, if (isDpmMode) "DPM / 3D Relief Filter ON" else "Standard Scan Mode", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(if (isDpmMode) LaserCyan.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.55f))
-                                .then(if (isDpmMode) Modifier.border(1.5.dp, LaserCyan, CircleShape) else Modifier)
-                                .testTag("dpm_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "Toggle DPM 3D Relief Filter",
-                                tint = if (isDpmMode) LaserCyan else Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            }
                         }
                     }
 
                     // 3-Segment Mode Switcher Pill: Single | Batch | OCR
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color.Black.copy(alpha = 0.55f),
+                        color = SurfaceSlate,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
                         modifier = Modifier.testTag("mode_toggle_surface")
                     ) {
                         Row(
-                            modifier = Modifier.padding(2.dp),
+                            modifier = Modifier.padding(3.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             ScanMode.entries.forEach { mode ->
@@ -490,7 +566,7 @@ fun ScannerScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
-                                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                        .background(if (isSelected) PrimaryCobalt else Color.Transparent)
                                         .clickable {
                                             if (mode != scanMode) {
                                                 scanMode = mode
@@ -501,228 +577,116 @@ fun ScannerScreen(
                                                 }
                                             }
                                         }
-                                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
                                     Text(
                                         text = if (mode == ScanMode.BATCH && batchCount > 0) "Batch ($batchCount)" else mode.label,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
+                                        color = if (isSelected) Color.White else TextMediumEmphasis
                                     )
                                 }
                             }
                         }
                     }
-
-                    // Right cluster: Camera Lens Switch & Gallery Photo Picker
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Switch Camera Lens (Front/Back)
-                        IconButton(
-                            onClick = {
-                                isBackCamera = !isBackCamera
-                                val target = if (isBackCamera) "Back Lens" else "Front Lens"
-                                Toast.makeText(context, "Switched to $target", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .testTag("camera_switch_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Cameraswitch,
-                                contentDescription = "Switch Camera Lens",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Pick Image from Gallery
-                        IconButton(
-                            onClick = {
-                                photoPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.55f))
-                                .testTag("gallery_picker_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PhotoLibrary,
-                                contentDescription = "Scan Image from Gallery",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
                 }
 
-                // Batch Mode / Status Notification Banner
-                AnimatedVisibility(
-                    visible = batchBannerText != null,
-                    enter = fadeIn() + slideInVertically(),
-                    exit = fadeOut() + slideOutVertically(),
-                    modifier = Modifier.padding(top = 10.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shadowElevation = 6.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = batchBannerText ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
-
-            // BOTTOM CONTROLS CLUSTER: Zoom Options + Bottom Navigation Bar
-            val zoomState by cameraController.zoomState.observeAsState()
-            val currentZoomRatio = zoomState?.zoomRatio ?: 1f
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Quick Lens Zoom Options Pill (1x, 2x, 3x)
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.Black.copy(alpha = 0.65f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                    modifier = Modifier.testTag("zoom_selector_pill")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        listOf(1.0f, 2.0f, 3.0f).forEach { zoomLevel ->
-                            val isSelected = (currentZoomRatio - zoomLevel).let { kotlin.math.abs(it) < 0.25f }
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .clickable {
-                                        try {
-                                            cameraController.setZoomRatio(zoomLevel)
-                                        } catch (_: Exception) {}
-                                    }
-                                    .testTag("zoom_button_${zoomLevel.toInt()}x"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${zoomLevel.toInt()}x",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Batch Mode Done Banner (if batch count > 0)
+                // Batch Mode Done Banner
                 if (isBatchMode && batchCount > 0) {
-                    FilledTonalButton(
+                    Button(
                         onClick = onNavigateToHistory,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SurfaceSlate,
+                            contentColor = TextHighEmphasis
                         ),
-                        modifier = Modifier.testTag("batch_done_button")
+                        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .height(48.dp)
+                            .testTag("batch_done_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Layers,
                             contentDescription = null,
+                            tint = PrimaryCobalt,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("View Batch Scans ($batchCount)")
+                        Text("View Batch Scans ($batchCount)", fontWeight = FontWeight.SemiBold)
                     }
                 }
 
                 // Main Navigation Buttons (History & Create QR)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // History button
-                    FilledTonalButton(
+                    // History button (48dp height)
+                    Button(
                         onClick = onNavigateToHistory,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SurfaceSlate,
+                            contentColor = TextHighEmphasis
                         ),
-                        modifier = Modifier.testTag("history_nav_button")
+                        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("history_nav_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.History,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            tint = TextMediumEmphasis,
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("History")
+                        Text("History", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
 
-                    // Create QR Code button
+                    // Create QR Code button (48dp height)
                     Button(
                         onClick = onNavigateToGenerate,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = PrimaryCobalt,
+                            contentColor = Color.White
                         ),
-                        modifier = Modifier.testTag("generate_nav_button")
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("generate_nav_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.QrCode,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Create QR")
+                        Text("Create QR", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     } else {
-        // Camera Permission Request Fallback
+        // Camera Permission Fallback
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(VoidCanvas)
                 .padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(containerColor = SurfaceSlate),
+                border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -732,121 +696,50 @@ fun ScannerScreen(
                     Icon(
                         imageVector = Icons.Default.QrCode,
                         contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        modifier = Modifier.size(48.dp),
+                        tint = PrimaryCobalt
                     )
                     Text(
                         text = "Camera Permission Required",
-                        style = MaterialTheme.typography.titleMedium
+                        color = TextHighEmphasis,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "SwiftScan uses the camera exclusively to scan QR codes and barcodes in real-time.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMediumEmphasis,
+                        fontSize = 14.sp
                     )
                     Button(
                         onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                        modifier = Modifier.fillMaxWidth().testTag("grant_permission_button")
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("grant_permission_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryCobalt,
+                            contentColor = Color.White
+                        )
                     ) {
-                        Text("Grant Permission")
+                        Text("Grant Permission", fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
     }
 
-    // Modal Bottom Sheet showing scan details and actions in Single Scan mode
-    if (!isBatchMode) {
+    // Modal Bottom Sheet for deep details and note editing
+    if (!isBatchMode && showDetailedSheet) {
         lastScan?.let { scan ->
             ScanResultSheet(
                 scanResult = scan,
                 onDismiss = {
-                    viewModel.clearLastScan()
+                    showDetailedSheet = false
                 },
                 onToggleFavorite = {
                     viewModel.toggleFavorite(it)
                 }
-            )
-        }
-    }
-}
-
-@Composable
-fun ScannerOverlay(
-    isScanningActive: Boolean,
-    isDpmActive: Boolean = false,
-    isOcrActive: Boolean = false,
-    isWide: Boolean = false
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "LaserAnimation")
-    val laserProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "LaserProgress"
-    )
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val width = size.width
-        val height = size.height
-        
-        // Adaptive box geometry: Square (1:1) vs Wide (2.4:1 for 1D linear barcodes and PDF417)
-        val boxWidth = width * (if (isWide) 0.88f else 0.72f)
-        val boxHeight = if (isWide) boxWidth * 0.42f else boxWidth
-        val left = (width - boxWidth) / 2
-        val top = (height - boxHeight) / 2.35f
-
-        // Darkened background framing mask
-        drawRect(
-            color = Color.Black.copy(alpha = 0.52f)
-        )
-
-        // Clear center transparent viewfinder
-        drawRect(
-            color = Color.Transparent,
-            topLeft = Offset(left, top),
-            size = Size(boxWidth, boxHeight),
-            blendMode = BlendMode.Clear
-        )
-
-        // Accent Corners
-        val cornerLength = if (isWide) 28.dp.toPx() else 36.dp.toPx()
-        val cornerThickness = 4.dp.toPx()
-        val accentColor = when {
-            isDpmActive -> Color(0xFF00F0FF) // Laser Cyan for DPM
-            isOcrActive -> Color(0xFF818CF8) // Indigo for OCR
-            isWide -> Color(0xFF00F0FF)      // Laser Cyan for Wide Barcodes
-            else -> Color(0xFF64B5F6)        // Standard Sky Blue
-        }
-
-        // Top Left
-        drawLine(accentColor, Offset(left, top), Offset(left + cornerLength, top), cornerThickness)
-        drawLine(accentColor, Offset(left, top), Offset(left, top + cornerLength), cornerThickness)
-
-        // Top Right
-        drawLine(accentColor, Offset(left + boxWidth, top), Offset(left + boxWidth - cornerLength, top), cornerThickness)
-        drawLine(accentColor, Offset(left + boxWidth, top), Offset(left + boxWidth, top + cornerLength), cornerThickness)
-
-        // Bottom Left
-        drawLine(accentColor, Offset(left, top + boxHeight), Offset(left + cornerLength, top + boxHeight), cornerThickness)
-        drawLine(accentColor, Offset(left, top + boxHeight), Offset(left, top + boxHeight - cornerLength), cornerThickness)
-
-        // Bottom Right
-        drawLine(accentColor, Offset(left + boxWidth, top + boxHeight), Offset(left + boxWidth - cornerLength, top + boxHeight), cornerThickness)
-        drawLine(accentColor, Offset(left + boxWidth, top + boxHeight), Offset(left + boxWidth, top + boxHeight - cornerLength), cornerThickness)
-
-        // Animated high-tech laser line
-        if (isScanningActive) {
-            val laserY = top + (boxHeight * laserProgress)
-            val laserColor = if (isDpmActive || isWide) Color(0xFF00F0FF) else if (isOcrActive) Color(0xFF818CF8) else Color(0xFF00E5FF)
-            drawLine(
-                color = laserColor.copy(alpha = 0.9f),
-                start = Offset(left + 8.dp.toPx(), laserY),
-                end = Offset(left + boxWidth - 8.dp.toPx(), laserY),
-                strokeWidth = 2.5.dp.toPx()
             )
         }
     }
