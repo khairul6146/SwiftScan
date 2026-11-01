@@ -1,38 +1,47 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.ScanResult
 import com.example.ui.MainViewModel
 import com.example.ui.components.ScanResultSheet
-import com.example.ui.theme.AlertCrimson
+import com.example.ui.theme.*
+import com.example.util.OcrUtils
 import com.example.util.ScanUtils
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.text.SimpleDateFormat
@@ -80,56 +89,100 @@ fun HistoryScreen(
         }
     }
 
+    // Chronological grouping: TODAY, YESTERDAY, EARLIER
+    val groupedHistory = remember(filteredHistory) {
+        filteredHistory.groupBy { scan ->
+            val scanCal = Calendar.getInstance().apply { timeInMillis = scan.timestamp }
+            val nowCal = Calendar.getInstance()
+
+            when {
+                nowCal.get(Calendar.YEAR) == scanCal.get(Calendar.YEAR) &&
+                        nowCal.get(Calendar.DAY_OF_YEAR) == scanCal.get(Calendar.DAY_OF_YEAR) -> "TODAY"
+
+                nowCal.get(Calendar.YEAR) == scanCal.get(Calendar.YEAR) &&
+                        nowCal.get(Calendar.DAY_OF_YEAR) - scanCal.get(Calendar.DAY_OF_YEAR) == 1 -> "YESTERDAY"
+
+                else -> "EARLIER"
+            }
+        }
+    }
+
     Scaffold(
+        containerColor = VoidCanvas,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Scan History", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Scan Vault",
+                            color = TextHighEmphasis,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            letterSpacing = (-0.4).sp
+                        )
                         if (history.isNotEmpty()) {
                             Text(
                                 text = "${filteredHistory.size} of ${history.size} items",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMediumEmphasis,
+                                fontSize = 12.sp
                             )
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("history_back_button")
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clickable(onClick = onNavigateBack)
+                            .testTag("history_back_button"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextHighEmphasis,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 },
                 actions = {
                     if (history.isNotEmpty()) {
-                        // Export Dialog Launcher (CSV or JSON)
-                        IconButton(
-                            onClick = { showExportDialog = true },
-                            modifier = Modifier.testTag("export_history_button")
+                        // Export Dialog Launcher (48dp Touch Target)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable { showExportDialog = true }
+                                .testTag("export_history_button"),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.FileUpload,
+                                imageVector = Icons.Default.FileUpload,
                                 contentDescription = "Export History",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = PrimaryCobalt,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        // Clear All History button
-                        IconButton(
-                            onClick = { showClearDialog = true },
-                            modifier = Modifier.testTag("clear_history_button")
+                        // Clear All History Button (48dp Touch Target)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable { showClearDialog = true }
+                                .testTag("clear_history_button"),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.DeleteSweep,
+                                imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "Clear All History",
-                                tint = MaterialTheme.colorScheme.error
+                                tint = StatusCrimson,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = VoidCanvas
+                )
             )
         }
     ) { innerPadding ->
@@ -138,44 +191,70 @@ fun HistoryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Search Input Field
+            // Search Input Field & Filter Chips
             if (history.isNotEmpty()) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                         .testTag("history_search_field"),
-                    placeholder = { Text("Search scanned codes...") },
+                    placeholder = { Text("Search scanned codes...", color = TextLowEmphasis) },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+                        Icon(Icons.Default.Search, contentDescription = null, tint = TextMediumEmphasis, modifier = Modifier.size(18.dp))
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = TextMediumEmphasis, modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PrimaryCobalt,
+                        unfocusedBorderColor = HairlineBorder,
+                        focusedContainerColor = SurfaceSlate,
+                        unfocusedContainerColor = SurfaceSlate,
+                        focusedTextColor = TextHighEmphasis,
+                        unfocusedTextColor = TextHighEmphasis
+                    )
                 )
 
-                // Filter Category Chips
+                // Filter Category Chips (Concentric 8dp radius)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     HistoryFilter.entries.forEach { filter ->
-                        FilterChip(
-                            selected = selectedFilter == filter,
-                            onClick = { selectedFilter = filter },
-                            label = { Text(filter.label) },
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                        val isSelected = selectedFilter == filter
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(34.dp)
+                                .background(
+                                    color = if (isSelected) PrimaryCobalt else SurfaceSlate,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) PrimaryCobalt else HairlineBorder,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { selectedFilter = filter },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = filter.label,
+                                color = if (isSelected) Color.White else TextMediumEmphasis,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -190,39 +269,67 @@ fun HistoryScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.QrCode,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.outline
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(SurfaceSlate, CircleShape)
+                                .border(1.dp, HairlineBorder, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCode,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = TextLowEmphasis
+                            )
+                        }
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) "No Matching Scans" else "Scan Vault Empty",
+                            color = TextHighEmphasis,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "No Matching Scans" else "No Scans Yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) "Try a different search query or filter" else "Codes you scan with camera or photo gallery will appear here automatically.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = if (searchQuery.isNotEmpty()) "Try a different search term or reset filter" else "Codes scanned in the viewfinder will be safely stored here with zero cloud telemetry.",
+                            color = TextMediumEmphasis,
+                            fontSize = 13.sp
                         )
                     }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredHistory, key = { it.id }) { scan ->
-                        HistoryItem(
-                            scan = scan,
-                            onToggleFavorite = { viewModel.toggleFavorite(scan) },
-                            onDelete = { viewModel.deleteScan(scan) },
-                            onClick = { selectedScan = scan }
-                        )
+                    listOf("TODAY", "YESTERDAY", "EARLIER").forEach { groupKey ->
+                        val groupItems = groupedHistory[groupKey]
+                        if (!groupItems.isNullOrEmpty()) {
+                            item(key = "header_$groupKey") {
+                                Text(
+                                    text = groupKey,
+                                    color = TextMediumEmphasis,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
+                                )
+                            }
+
+                            items(groupItems, key = { it.id }) { scan ->
+                                HistoryCard(
+                                    scan = scan,
+                                    onToggleFavorite = { viewModel.toggleFavorite(scan) },
+                                    onDelete = { viewModel.deleteScan(scan) },
+                                    onQuickCopy = {
+                                        ScanUtils.copyToClipboard(context, scan.content)
+                                    },
+                                    onClick = { selectedScan = scan }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -242,28 +349,48 @@ fun HistoryScreen(
     if (showExportDialog) {
         AlertDialog(
             onDismissRequest = { showExportDialog = false },
-            title = { Text("Export History", fontWeight = FontWeight.Bold) },
+            containerColor = SurfaceElevated,
+            title = {
+                Text(
+                    text = "Export Scan Vault",
+                    color = TextHighEmphasis,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
-                Text("Select your preferred export format for ${filteredHistory.size} scan records:")
+                Text(
+                    text = "Select export format for ${filteredHistory.size} scan records:",
+                    color = TextMediumEmphasis
+                )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         val csv = ScanUtils.exportHistoryAsCsv(filteredHistory)
                         ScanUtils.shareText(context, csv, "Share Scanned History (CSV)")
                         showExportDialog = false
-                    }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryCobalt,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("Export CSV")
+                    Text("Export CSV", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(
+                OutlinedButton(
                     onClick = {
                         val json = ScanUtils.exportHistoryAsJson(filteredHistory)
                         ScanUtils.shareText(context, json, "Share Scanned History (JSON)")
                         showExportDialog = false
-                    }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TextHighEmphasis
+                    )
                 ) {
                     Text("Export JSON")
                 }
@@ -275,21 +402,38 @@ fun HistoryScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear All History?") },
-            text = { Text("This will permanently delete all ${history.size} saved scan records.") },
+            containerColor = SurfaceElevated,
+            title = {
+                Text(
+                    text = "Clear All Records?",
+                    color = TextHighEmphasis,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "This will permanently delete all ${history.size} saved scan records from your device.",
+                    color = TextMediumEmphasis
+                )
+            },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         viewModel.clearHistory()
                         showClearDialog = false
-                    }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = StatusCrimson,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("Delete All", color = MaterialTheme.colorScheme.error)
+                    Text("Delete All", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel", color = TextMediumEmphasis)
                 }
             }
         )
@@ -297,98 +441,142 @@ fun HistoryScreen(
 }
 
 @Composable
-fun HistoryItem(
+fun HistoryCard(
     scan: ScanResult,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
+    onQuickCopy: () -> Unit,
     onClick: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy  HH:mm", Locale.getDefault()) }
-    val dateString = remember(scan.timestamp) { dateFormat.format(Date(scan.timestamp)) }
+    val dateFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val timeString = remember(scan.timestamp) { dateFormat.format(Date(scan.timestamp)) }
     val typeName = remember(scan.type, scan.content) { ScanUtils.getTypeName(scan.type, scan.content) }
 
     val isUrl = scan.type == Barcode.TYPE_URL || scan.content.startsWith("http://") || scan.content.startsWith("https://")
     val isWifi = scan.type == Barcode.TYPE_WIFI || scan.content.startsWith("WIFI:")
+    val isOcr = scan.format == OcrUtils.FORMAT_OCR_TEXT
+
     val icon: ImageVector = when {
+        isOcr -> Icons.Default.Pin
         isUrl -> Icons.Default.Language
         isWifi -> Icons.Default.Wifi
         else -> Icons.Default.TextFields
     }
 
-    Card(
+    // Solid SurfaceSlate card with 1dp HairlineBorder, concentric 14dp radius
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .testTag("history_item_${scan.id}"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            .background(SurfaceSlate, RoundedCornerShape(14.dp))
+            .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp)
+            .testTag("history_item_${scan.id}")
     ) {
         Row(
-            modifier = Modifier
-                .padding(14.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(44.dp)
+            // Icon glyph in SurfaceElevated container
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(SurfaceElevated, RoundedCornerShape(10.dp))
+                    .border(1.dp, HairlineBorder, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = PrimaryCobalt,
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
+            // Text metadata
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = typeName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = typeName,
+                        color = PrimaryCobalt,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "•",
+                        color = TextLowEmphasis,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = timeString,
+                        color = TextMediumEmphasis,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
                     text = scan.content,
-                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextHighEmphasis,
+                    fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = dateString,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // 1-Tap Quick-Copy Button (48dp Touch Target)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(onClick = onQuickCopy)
+                    .testTag("copy_item_${scan.id}"),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Quick Copy",
+                    tint = TextMediumEmphasis,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
-            IconButton(
-                onClick = onToggleFavorite,
-                modifier = Modifier.size(36.dp)
+            // Favorite Star Toggle (48dp Touch Target)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(onClick = onToggleFavorite),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (scan.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    imageVector = if (scan.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                     contentDescription = "Toggle Favorite",
-                    tint = if (scan.isFavorite) AlertCrimson else MaterialTheme.colorScheme.outline,
+                    tint = if (scan.isFavorite) StatusAmber else TextLowEmphasis,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp).testTag("delete_item_${scan.id}")
+            // Delete Item Button (48dp Touch Target)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(onClick = onDelete)
+                    .testTag("delete_item_${scan.id}"),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Item",
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(20.dp)
+                    tint = TextLowEmphasis,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
