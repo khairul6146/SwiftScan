@@ -1,37 +1,40 @@
 # DESIGN.md — SwiftScan Visual & Interaction System
 
-> **Product Thesis:** SwiftScan is a lightweight, privacy-first, tactile QR and Barcode power scanner engineered for instant performance (<300ms camera-to-action), quishing (phishing) security protection, high-throughput batch operations, and a clean Material 3 Expressive design.
+> **Product Thesis:** SwiftScan is an ultra-fast, privacy-first, anti-slop mobile vision and barcode scanning power tool for Android. Engineered for instant performance (<100ms camera-to-action), quishing security protection, high-throughput batch operations, and a refined Material 3 Expressive Titanium & Cobalt design contract.
 
 ---
 
 ## 1. Design Engineering Philosophy
 
-SwiftScan balances **extreme lightness** (zero bloat, zero 3rd-party UI dependencies, pure hardware-accelerated Jetpack Compose Canvas) with **tactile industrial precision** (inspired by `better-ui`, `better-layout`, and `better-colors`).
+SwiftScan balances **extreme lightness** (zero bloat, zero 3rd-party UI dependencies, pure hardware-accelerated Jetpack Compose Canvas) with **tactile industrial precision** (in strict compliance with `antislop-ui`, `better-ui`, `better-layout`, `better-colors`, and `better-accessibility`).
 
 ### Core Tenets
 1. **Performance Over Decoration:** Zero interstitial lag. Every frame is budgeted. Viewfinder overlays use a single composite hardware Canvas call rather than layered Compose boxes.
-2. **Concentric Radii Mathematics:** Mismatched nested corners make interfaces feel cheap. All nested surfaces follow the strict formula: `outerRadius = innerRadius + padding`.
-3. **Space-First Visual Grouping:** Use generous negative space (8dp intra-group, 16dp+ inter-group) rather than heavy borders or divider lines.
-4. **Optical Center Alignment:** Viewfinder reticle, scanner icons, and badge counters are optically balanced rather than purely geometrically centered.
-5. **Tactile Haptic Restraint:** Feedback is restricted to crisp 45ms physical clicks (`VibrationEffect.EFFECT_CLICK`) and subtle, low-latency audio pings (no multi-frequency buzzing).
+2. **Concentric Radii Mathematics:** Mismatched nested corners make interfaces feel cheap. All nested surfaces follow the strict formula: `outerRadius = innerRadius + padding` (`20dp` containers, `14dp` cards, `12dp` buttons, `8dp` chips).
+3. **Space-First Visual Grouping:** Use generous negative space rather than heavy borders or divider lines.
+4. **Optical Hairline Precision:** 1.5px/2px crisp reticle corners and subtle central optical crosshairs without generic neon glows or animated laser sweeps.
+5. **Tactile Haptic Restraint:** Feedback is restricted to crisp 45ms physical clicks (`VibrationEffect.EFFECT_CLICK`) and subtle, low-latency audio pings.
+6. **Guaranteed 48dp Touch Targets:** Every interactive icon, button, and toggle has a minimum $48\text{dp} \times 48\text{dp}$ touch target.
 
 ---
 
-## 2. Color Palette & Token System (OKLCH-Calibrated Hex)
+## 2. Color Palette & Token System (Titanium & Cobalt)
 
-The palette balances dark viewfinder contrast with bright day-mode clarity, avoiding muddy intermediate grays.
+The palette balances dark viewfinder contrast with bright day-mode clarity, adhering to strict WCAG AA/AAA contrast guidelines.
 
 | Token Name | Hex Value | Purpose / Semantics |
 | :--- | :--- | :--- |
-| `LaserCyan` | `#00F0FF` | Primary active targeting reticle, pulse scan-line, precision accents |
-| `SafeEmerald` | `#10B981` | Verified safe URLs, Wi-Fi connected badge, successful scan flashes |
-| `CautionAmber` | `#F59E0B` | Unverified redirects, unknown domains, duplicate warnings |
-| `AlertCrimson` | `#EF4444` | Malicious URL flag, suspicious executable downloads, destructive actions |
-| `ObsidianBase` | `#0A0E17` | Viewfinder HUD background, deep dark canvas |
-| `SurfaceElevated` | `#161F30` | Cards, bottom sheet surface, floating HUD pill containers |
-| `SurfaceGlass` | `rgba(16, 24, 39, 0.75)` | Translucent frosted floating control pills (with 1dp subtle white stroke) |
-| `TextPrimary` | `#FFFFFF` | High-contrast typography on dark HUD |
-| `TextMuted` | `#94A3B8` | Secondary labels, timestamps, metadata |
+| `VoidCanvas` | `#0B0D11` | Viewfinder HUD background, base dark canvas (OKLCH `0.13 0.008 260`) |
+| `SurfaceSlate` | `#161920` | Elevated cards, segmented switcher background, button surface |
+| `SurfaceElevated` | `#20242D` | Floating pill containers, dialogs, sheet surfaces |
+| `HairlineBorder` | `#2C323E` | Crisp 1dp perimeter stroke on elevated surfaces |
+| `PrimaryCobalt` | `#2563EB` | Single primary action accent (WCAG AA $5.17:1$ against white) |
+| `StatusEmerald` | `#10B981` | Verified safe URLs, Wi-Fi connected badge, successful decode reticle flash |
+| `StatusAmber` | `#F59E0B` | Retail products, GTIN/ISBN barcodes, caution warnings |
+| `StatusCrimson` | `#EF4444` | Security threats, phishing flags, destructive delete actions |
+| `TextHighEmphasis` | `#F8FAFC` | Primary labels, headers, and codes (WCAG AAA $\ge 7:1$) |
+| `TextMediumEmphasis` | `#94A3B8` | Subtitles, metadata, secondary timestamps |
+| `TextLowEmphasis` | `#64748B` | Monospace tags, auxiliary captions |
 
 ---
 
@@ -39,18 +42,20 @@ The palette balances dark viewfinder contrast with bright day-mode clarity, avoi
 
 All UI components adhere to a 4dp incremental grid and strict radius geometry:
 
-* **Floating Control Pills (Top & Zoom Bars):**
-  - Height: `44dp`
-  - Outer Radius: `22dp` (fully pillular)
-  - Inner Icon Button: `36dp` with `18dp` radius and `4dp` internal padding
-* **Scan Result Bottom Sheet:**
-  - Top Corners Radius: `24dp`
-  - Container Background: `SurfaceElevated` (`#161F30`)
-  - Internal Action Cards: Radius `16dp` with `12dp` internal padding (satisfying concentric ratio: `24 ≈ 16 + 8`)
-* **Viewfinder Reticle:**
-  - Corner Radius: `18dp`
-  - Corner Arm Length: `32dp`
-  - Stroke Width: `3.5dp` (clean, visible, high-contrast)
+* **Turbo Action Pill (Floating above bottom navigation):**
+  - Container Radius: `20dp`
+  - Internal Action Buttons: `12dp` radius, `48dp` minimum height
+  - Container Padding: `14dp`
+  - Concentric relation: $20\text{dp} \approx 12\text{dp} + 8\text{dp}$
+* **Code Studio & Vault Cards:**
+  - Card Radius: `14dp`
+  - Internal Padding: `12dp`
+  - Stroke: `1dp` `HairlineBorder`
+* **Precision Viewfinder Reticle:**
+  - Corner Radius: `10dp`
+  - Corner Arm Length: `28dp`
+  - Corner Stroke: `2dp` (`HairlineBorder` when idle, snappy `StatusEmerald` contraction on lock)
+  - Center Crosshair: `2.5dp` dot + `16dp` crosshair lines at 40% alpha
 
 ---
 
@@ -58,54 +63,45 @@ All UI components adhere to a 4dp incremental grid and strict radius geometry:
 
 ```
 +-------------------------------------------------------------+
-| [Flash]  [Sound]        [ SINGLE | BATCH ]      [Lens] [Gallery] |  <-- Top HUD Controls (floating 16dp from edges)
+| SwiftScan  [AUTO-COPY]   [Sound]  [Flash]  [Lens]  [Gallery] |  <-- Top Precision HUD (floating, statusBarsPadding)
 |                                                             |
 |                                                             |
 |                    +-------------------+                    |
 |                    | ┏               ┓ |                    |
-|                    |   [ Laser Bar ]   | |                    |  <-- Optics Viewfinder Reticle
-|                    | ┗               ┛ |                    |      (Hardware Canvas, Cyan glow)
+|                    |         •         | |                    |  <-- Optical Reticle HUD
+|                    | ┗               ┛ |                    |      (1.5px Hairline, Crosshair, Telemetry)
 |                    +-------------------+                    |
-|                      Targeting Active                       |
+|                      LOCKED (19ms)                          |
 |                                                             |
-|                         [ 1x | 2x | 3x ]                    |  <-- Zoom Quick-Pill (floating 20dp above nav)
+|          +---------------------------------------+          |
+|          | 🌐 example.com                [SAFE]  |          |  <-- Non-Blocking Turbo Action Pill
+|          | [ Open Link ↗ ]    [ Copy URL ]       |          |      (Anchored above nav, spring motion)
+|          +---------------------------------------+          |
 |                                                             |
-|               [ History (12) ]    [ Create QR ]             |  <-- Bottom Docked Actions (inset 16dp)
+|            [ 1x | 2x | 3x ]      [ Single | Batch | OCR ]   |  <-- Zoom & Mode Switcher Pills
+|                                                             |
+|               [ History (12) ]    [ Create QR ]             |  <-- Bottom Docked Actions (48dp height)
 +-------------------------------------------------------------+
 ```
 
 ### Layout Rules
 1. **Content Bleeds, Controls Float:** The camera preview bleeds 100% edge-to-edge. All controls float inside system window insets (`statusBarsPadding()` and `navigationBarsPadding()`).
-2. **Thumb Zone Docking:** Primary interaction targets (History, Create, Zoom, View Batch) are docked in the lower third of the screen for natural one-handed reachability.
-3. **Separators Eliminated:** Sections in the bottom sheet and history lists are demarcated by 12dp–16dp negative space, not horizontal hairline rules.
+2. **Thumb Zone Docking:** Primary interaction targets (Turbo Action Pill, Zoom, Mode Switcher, History, Create QR) are docked in the lower third for effortless one-handed operation.
+3. **Non-Blocking Architecture:** Scans do not freeze the viewfinder with full-screen modals. The Turbo Action Pill slides up seamlessly without interrupting the camera pipeline.
 
 ---
 
 ## 5. Motion & Micro-Interactions (`better-ui` Standard)
 
-* **Viewfinder Sweep:** Linear continuous vertical sweep (1800ms period) with fade-out at viewport edges.
-* **Lock-On Snap:**
-  - Viewfinder corners flash `SafeEmerald` (`#10B981`) for 120ms on decode.
-  - Scale on Press: All interactive pill buttons use subtle `scale(0.96)` tactile compression on press.
-* **Bottom Sheet Entrance:** Spring animation with `dampingRatio = 0.82f` and `stiffness = Spring.StiffnessMediumLow`. No jarring rigid slide.
-* **Batch Counter Increment:** Number transition using `slideInVertically` + `fadeIn` (duration: 150ms). Duplicate detections trigger a quick 3-pixel horizontal nudge shake.
+* **Reticle Lock-On:** Snappy 120ms corner contraction ($200\text{dp} \to 190\text{dp}$) with instant color transition to `StatusEmerald`.
+* **Turbo Action Pill Entrance/Exit:** Fluid spring animation (`dampingRatio = 0.8f`, `stiffness = 400f`).
+* **Scale on Press:** Tactile feedback on all interactive icon buttons.
 
 ---
 
-## 6. Quishing (Anti-Phishing) Security UX
+## 6. App Icon Specification
 
-When a URL QR code is scanned:
-1. **Domain Highlight Header:** The root domain (e.g. `github.com`) is displayed in 20sp Bold Display, while subdomains and path queries are rendered in muted, de-emphasized mono typography.
-2. **Security Shield Indicator:**
-   - 🟢 **Verified HTTPS:** Valid standard web protocol.
-   - 🟡 **Caution:** IP addresses (`http://192.168...`), unusual ports (`:8080`), or URL shorteners with a 1-tap "Unshorten URL" preview button.
-   - 🔴 **Danger Flag:** Cleartext HTTP with password inputs, direct executable links (`.apk`, `.bat`), or malicious schemes.
-3. **1-Tap Tracker Strip:** Automatic toggle to strip `utm_source`, `fbclid`, `gclid`, and affiliate tags before launching the browser.
-
----
-
-## 7. QR Generator Studio UI
-
-* **Live Real-time Preview:** 220dp centered QR canvas that re-renders dynamically on text change using coroutine debouncing.
-* **Palette Switcher:** 5 curated high-contrast palettes (Industrial Black, Laser Cyan, Cyber Indigo, Forest Green, Crimson Alert).
-* **High-Res Export:** Direct 1-tap export options: **Save High-Res PNG (1024x1024)** or **Share QR**.
+* **Style:** Concept A — Precision Optical Reticle.
+* **Canvas:** Deep Obsidian (`#0B0D11`) with subtle titanium radial depth.
+* **Foreground:** 4 precision optical corner brackets (`#F8FAFC`, radius 5dp) framing 3 Cobalt Blue finder nodes (`#2563EB`) and a Sky Blue velocity laser beam (`#38BDF8`) with an Emerald status dot.
+* **Themed Icons:** Includes dedicated monochrome layer (`ic_launcher_monochrome.xml`) supporting Android 13/14/15 Material You dynamic wallpaper theming.

@@ -4,9 +4,10 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org/)
 [![Jetpack Compose](https://img.shields.io/badge/Compose-BOM_2024.04.01-4285F4.svg?style=flat&logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![ML Kit](https://img.shields.io/badge/Google_ML_Kit-Vision_&_OCR-EA4335.svg?style=flat&logo=google)](https://developers.google.com/ml-kit)
+[![Design](https://img.shields.io/badge/Design-Titanium_&_Cobalt-2563EB.svg?style=flat)](DESIGN.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-An ultra-fast, privacy-first, ad-free Industrial Vision & Scanning suite for Android. Engineered for sub-100ms hardware-accelerated decode, direct part marking (DPM / 3D relief) inversion, high-throughput batch logistics, damaged-code OCR fallback, and built-in anti-quishing cybersecurity protection.
+An ultra-fast, privacy-first, ad-free mobile vision and barcode scanning power tool for Android. Crafted under strict anti-slop design principles with the **Titanium & Cobalt** design system, sub-100ms hardware-accelerated decode, direct part marking (DPM / 3D relief) inversion, high-throughput batch logistics, damaged-code OCR fallback, non-blocking Turbo Action Pill, and built-in anti-quishing cybersecurity protection.
 
 ---
 
@@ -18,6 +19,8 @@ Most QR scanners on Google Play are bloated with full-screen ads, track user dat
 | :--- | :--- | :--- |
 | **Monetization & Privacy** | Ads, trackers, data harvesting | **100% Ad-Free, Local-Only, Zero Telemetry** |
 | **Latency & Architecture** | 400ms – 1200ms latency, heavy web wrappers | **< 100ms camera-to-action**, native CameraX + Jetpack Compose |
+| **UX & Viewfinder** | Intrusive full-screen modal sheets | **Non-blocking Turbo Action Pill** anchored above navigation |
+| **Anti-Slop Design** | Cheesy neon glows, laser animations, generic gradients | **Titanium & Cobalt**, 1.5px optical reticle, concentric radii |
 | **3D / DPM Relief & Dot Peen** | Fails completely on low-contrast metal codes | **Luminance Inversion engine (\(255 - Y\)) & contrast stretching** |
 | **Damaged / Scratched Codes** | Inability to decode causes workflow stoppage | **Instant OCR Fallback** extracts serial & part numbers automatically |
 | **Security (Anti-Quishing)** | Blindly auto-opens malicious URLs | **Proactive Threat Analysis** (punycode, unmasked IPs, tracking stripping) |
@@ -53,10 +56,11 @@ Most QR scanners on Google Play are bloated with full-screen ads, track user dat
 ## 📱 User Interface & Design Contract
 
 SwiftScan is crafted under strict design engineering principles (documented in [`DESIGN.md`](DESIGN.md)):
-* **Laser Cyan HUD:** High-contrast `#00F0FF` reticle overlay rendered directly onto hardware Canvas.
-* **Concentric Radii Mathematics:** Nested card and button corners follow mathematical radii ratios (`outerRadius = innerRadius + padding`).
-* **Tactile Haptic Restraint:** Crisp 45ms physical clicks (`VibrationEffect.EFFECT_CLICK`) and audio chirp feedback.
-* **Segmented Mode Switcher:** Smooth 3-segment switcher `[ Single | Batch | OCR ]` with floating torch, zoom (\(1\times\) / \(2\times\)), and DPM toggle.
+* **Titanium & Cobalt Palette:** Pure obsidian canvas (`#0B0D11`), elevated slate surfaces (`#161920`, `#20242D`), hairline borders (`#2C323E`), and a deliberate Cobalt Blue accent (`#2563EB`).
+* **Precision Optical Reticle HUD:** Crisp 1.5px/2px corner brackets, central optical crosshair, and real-time decode telemetry badge.
+* **Non-Blocking Turbo Action Pill:** Concentric 20dp floating card with context-aware quick actions (Wi-Fi, URL, Products, vCard, Plain Text).
+* **Guaranteed 48dp Touch Targets:** 100% of interactive controls pass minimum $48\text{dp} \times 48\text{dp}$ accessibility bounds.
+* **Modern Adaptive Icon:** Precision Optical Reticle design with Android 13/14/15 Material You themed icon support.
 
 ---
 
@@ -93,7 +97,7 @@ SwiftScan is crafted under strict design engineering principles (documented in [
 ## 📦 Direct APK Download
 
 For quick installation, pre-built APK binaries are packaged inside the repository:
-* **Release Artifact:** [`dist/SwiftScan.apk`](dist/SwiftScan.apk) (~81.5 MB with full ML Kit models bundled)
+* **Release Artifact:** [`dist/SwiftScan.apk`](dist/SwiftScan.apk) (~86.3 MB with full ML Kit models bundled)
 
 ---
 
