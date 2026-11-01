@@ -36,9 +36,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.example.ui.theme.*
 import com.example.util.QrGenerator
 import com.example.util.ScanUtils
 import java.io.File
@@ -56,11 +59,11 @@ enum class QrType(val label: String) {
 data class QrPalette(val name: String, val colorInt: Int, val composeColor: Color)
 
 val PRESET_PALETTES = listOf(
-    QrPalette("Black", android.graphics.Color.BLACK, Color(0xFF000000)),
-    QrPalette("Laser Cyan", android.graphics.Color.parseColor("#00838F"), Color(0xFF00838F)),
-    QrPalette("Indigo", android.graphics.Color.parseColor("#3730A3"), Color(0xFF3730A3)),
-    QrPalette("Emerald", android.graphics.Color.parseColor("#065F46"), Color(0xFF065F46)),
-    QrPalette("Crimson", android.graphics.Color.parseColor("#991B1B"), Color(0xFF991B1B))
+    QrPalette("Obsidian", android.graphics.Color.BLACK, Color(0xFF0B0D11)),
+    QrPalette("Cobalt", android.graphics.Color.parseColor("#1E3A8A"), Color(0xFF1E3A8A)),
+    QrPalette("Forest", android.graphics.Color.parseColor("#065F46"), Color(0xFF065F46)),
+    QrPalette("Deep Maroon", android.graphics.Color.parseColor("#881337"), Color(0xFF881337)),
+    QrPalette("Charcoal", android.graphics.Color.parseColor("#334155"), Color(0xFF334155))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,17 +131,37 @@ fun GenerateScreen(
     }
 
     Scaffold(
+        containerColor = VoidCanvas,
         topBar = {
             TopAppBar(
-                title = { Text("Generate QR Code", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "Code Studio",
+                        color = TextHighEmphasis,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        letterSpacing = (-0.4).sp
+                    )
+                },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("generate_back_button")
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clickable(onClick = onNavigateBack)
+                            .testTag("generate_back_button"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextHighEmphasis,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = VoidCanvas
+                )
             )
         }
     ) { padding ->
@@ -146,48 +169,63 @@ fun GenerateScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = 20.dp, vertical = 6.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Type Selector Chips
+            // Type Selector Chips (Concentric 8dp radius)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 QrType.entries.forEach { type ->
                     val isSelected = selectedType == type
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { selectedType = type },
-                        label = { Text(type.label, style = MaterialTheme.typography.labelSmall) },
-                        leadingIcon = {
-                            val icon = when (type) {
-                                QrType.TEXT -> Icons.Default.TextFields
-                                QrType.URL -> Icons.Default.Language
-                                QrType.WIFI -> Icons.Default.Wifi
-                                QrType.PHONE -> Icons.Default.Phone
-                                QrType.CONTACT -> Icons.Default.ContactPage
-                            }
-                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("chip_${type.name.lowercase()}")
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .background(
+                                color = if (isSelected) PrimaryCobalt else SurfaceSlate,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) PrimaryCobalt else HairlineBorder,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable { selectedType = type }
+                            .testTag("chip_${type.name.lowercase()}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = type.label,
+                            color = if (isSelected) Color.White else TextMediumEmphasis,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
-            // Input Fields based on type
+            // Input Fields based on type (Concentric 12dp radius, HairlineBorder)
             when (selectedType) {
                 QrType.TEXT -> {
                     OutlinedTextField(
                         value = textInput,
                         onValueChange = { textInput = it },
-                        label = { Text("Enter plain text") },
-                        placeholder = { Text("e.g. Note, message, or asset ID") },
+                        label = { Text("Enter plain text", color = TextMediumEmphasis) },
+                        placeholder = { Text("e.g. Note, serial, or SKU payload", color = TextLowEmphasis) },
                         modifier = Modifier.fillMaxWidth().testTag("input_text"),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryCobalt,
+                            unfocusedBorderColor = HairlineBorder,
+                            focusedContainerColor = SurfaceSlate,
+                            unfocusedContainerColor = SurfaceSlate,
+                            focusedTextColor = TextHighEmphasis,
+                            unfocusedTextColor = TextHighEmphasis
+                        ),
                         minLines = 2,
                         maxLines = 4
                     )
@@ -196,10 +234,18 @@ fun GenerateScreen(
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it },
-                        label = { Text("Website Address") },
-                        placeholder = { Text("example.com or https://...") },
+                        label = { Text("Website Address", color = TextMediumEmphasis) },
+                        placeholder = { Text("example.com or https://...", color = TextLowEmphasis) },
                         modifier = Modifier.fillMaxWidth().testTag("input_url"),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryCobalt,
+                            unfocusedBorderColor = HairlineBorder,
+                            focusedContainerColor = SurfaceSlate,
+                            unfocusedContainerColor = SurfaceSlate,
+                            focusedTextColor = TextHighEmphasis,
+                            unfocusedTextColor = TextHighEmphasis
+                        ),
                         singleLine = true
                     )
                 }
@@ -211,17 +257,33 @@ fun GenerateScreen(
                         OutlinedTextField(
                             value = wifiSsid,
                             onValueChange = { wifiSsid = it },
-                            label = { Text("Network Name (SSID)") },
+                            label = { Text("Network Name (SSID)", color = TextMediumEmphasis) },
                             modifier = Modifier.fillMaxWidth().testTag("input_wifi_ssid"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryCobalt,
+                                unfocusedBorderColor = HairlineBorder,
+                                focusedContainerColor = SurfaceSlate,
+                                unfocusedContainerColor = SurfaceSlate,
+                                focusedTextColor = TextHighEmphasis,
+                                unfocusedTextColor = TextHighEmphasis
+                            ),
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = wifiPassword,
                             onValueChange = { wifiPassword = it },
-                            label = { Text("Password (leave blank if open)") },
+                            label = { Text("Password (leave blank if open)", color = TextMediumEmphasis) },
                             modifier = Modifier.fillMaxWidth().testTag("input_wifi_password"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryCobalt,
+                                unfocusedBorderColor = HairlineBorder,
+                                focusedContainerColor = SurfaceSlate,
+                                unfocusedContainerColor = SurfaceSlate,
+                                focusedTextColor = TextHighEmphasis,
+                                unfocusedTextColor = TextHighEmphasis
+                            ),
                             singleLine = true
                         )
                     }
@@ -230,10 +292,18 @@ fun GenerateScreen(
                     OutlinedTextField(
                         value = phoneInput,
                         onValueChange = { phoneInput = it },
-                        label = { Text("Phone Number") },
-                        placeholder = { Text("+1234567890") },
+                        label = { Text("Phone Number", color = TextMediumEmphasis) },
+                        placeholder = { Text("+1234567890", color = TextLowEmphasis) },
                         modifier = Modifier.fillMaxWidth().testTag("input_phone"),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryCobalt,
+                            unfocusedBorderColor = HairlineBorder,
+                            focusedContainerColor = SurfaceSlate,
+                            unfocusedContainerColor = SurfaceSlate,
+                            focusedTextColor = TextHighEmphasis,
+                            unfocusedTextColor = TextHighEmphasis
+                        ),
                         singleLine = true
                     )
                 }
@@ -245,43 +315,68 @@ fun GenerateScreen(
                         OutlinedTextField(
                             value = contactName,
                             onValueChange = { contactName = it },
-                            label = { Text("Full Name") },
+                            label = { Text("Full Name", color = TextMediumEmphasis) },
                             modifier = Modifier.fillMaxWidth().testTag("input_contact_name"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryCobalt,
+                                unfocusedBorderColor = HairlineBorder,
+                                focusedContainerColor = SurfaceSlate,
+                                unfocusedContainerColor = SurfaceSlate,
+                                focusedTextColor = TextHighEmphasis,
+                                unfocusedTextColor = TextHighEmphasis
+                            ),
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = contactPhone,
                             onValueChange = { contactPhone = it },
-                            label = { Text("Phone Number") },
+                            label = { Text("Phone Number", color = TextMediumEmphasis) },
                             modifier = Modifier.fillMaxWidth().testTag("input_contact_phone"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryCobalt,
+                                unfocusedBorderColor = HairlineBorder,
+                                focusedContainerColor = SurfaceSlate,
+                                unfocusedContainerColor = SurfaceSlate,
+                                focusedTextColor = TextHighEmphasis,
+                                unfocusedTextColor = TextHighEmphasis
+                            ),
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = contactEmail,
                             onValueChange = { contactEmail = it },
-                            label = { Text("Email Address") },
+                            label = { Text("Email Address", color = TextMediumEmphasis) },
                             modifier = Modifier.fillMaxWidth().testTag("input_contact_email"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryCobalt,
+                                unfocusedBorderColor = HairlineBorder,
+                                focusedContainerColor = SurfaceSlate,
+                                unfocusedContainerColor = SurfaceSlate,
+                                focusedTextColor = TextHighEmphasis,
+                                unfocusedTextColor = TextHighEmphasis
+                            ),
                             singleLine = true
                         )
                     }
                 }
             }
 
-            // Palette Theme Color Picker
+            // Palette Theme Color Picker (Restrained swatches with concentric active ring)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "QR Code Color:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Ink Palette",
+                    color = TextMediumEmphasis,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PRESET_PALETTES.forEach { palette ->
                         val isSelected = selectedPalette == palette
                         Box(
@@ -291,8 +386,8 @@ fun GenerateScreen(
                                 .background(palette.composeColor)
                                 .clickable { selectedPalette = palette }
                                 .then(
-                                    if (isSelected) Modifier.border(2.dp, Color.White, CircleShape)
-                                    else Modifier
+                                    if (isSelected) Modifier.border(2.dp, PrimaryCobalt, CircleShape)
+                                    else Modifier.border(1.dp, HairlineBorder, CircleShape)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {}
@@ -300,28 +395,28 @@ fun GenerateScreen(
                 }
             }
 
-            // QR Code Preview Area
-            Card(
+            // Clean Optical QR Canvas Card (Crisp white canvas, quiet zones, concentric 20dp container)
+            Box(
                 modifier = Modifier
-                    .size(240.dp)
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .background(SurfaceSlate, RoundedCornerShape(20.dp))
+                    .border(1.dp, HairlineBorder, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
                     .testTag("qr_preview_card"),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (qrBitmap != null) {
+                if (qrBitmap != null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .padding(16.dp)
+                                .size(180.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color.White)
-                                .padding(8.dp)
+                                .padding(12.dp)
                         ) {
                             Image(
                                 bitmap = qrBitmap!!.asImageBitmap(),
@@ -329,29 +424,36 @@ fun GenerateScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
-                    } else {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TextFields,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.outline
-                            )
-                            Text(
-                                text = "Preview will appear here",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
+
+                        Text(
+                            text = "QR CODE • 600 DPI • QUIET ZONE VERIFIED",
+                            color = TextLowEmphasis,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TextFields,
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                            tint = TextLowEmphasis
+                        )
+                        Text(
+                            text = "Enter content to generate code",
+                            color = TextMediumEmphasis,
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }
 
-            // Action Buttons: Save & Share
+            // Action Buttons: Save & Share (48dp height minimum, concentric 12dp radius)
             if (qrBitmap != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -370,7 +472,11 @@ fun GenerateScreen(
                             .weight(1f)
                             .height(48.dp)
                             .testTag("save_qr_button"),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryCobalt,
+                            contentColor = Color.White
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Download,
@@ -378,10 +484,10 @@ fun GenerateScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save HD")
+                        Text("Save HD", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    OutlinedButton(
+                    Button(
                         onClick = {
                             shareQrCodeImage(context, qrBitmap!!)
                         },
@@ -389,7 +495,12 @@ fun GenerateScreen(
                             .weight(1f)
                             .height(48.dp)
                             .testTag("share_qr_button"),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SurfaceSlate,
+                            contentColor = TextHighEmphasis
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
@@ -397,24 +508,38 @@ fun GenerateScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Share")
+                        Text("Share", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                // Copy Payload
-                TextButton(
-                    onClick = {
-                        ScanUtils.copyToClipboard(context, rawContentToEncode)
-                    },
-                    modifier = Modifier.testTag("copy_payload_button")
+                // Copy Payload Button (48dp Touch Target)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clickable {
+                            ScanUtils.copyToClipboard(context, rawContentToEncode)
+                        }
+                        .testTag("copy_payload_button"),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Copy Raw Text")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = PrimaryCobalt,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Copy Raw Payload",
+                            color = PrimaryCobalt,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
