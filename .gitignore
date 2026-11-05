@@ -1,18 +1,53 @@
-*.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+# Preserve official pre-built deliverable
+!dist/SwiftScan.apk
+
+# Gradle files
+.gradle/
+build/
+app/build/
+.kotlin/
+
+# Local configuration file (sdk path, etc)
 local.properties
-.env
+
+# Log files
+*.log
+
+# Android Studio Navigation editor temp files
+.navigation/
+
+# Android Studio / IntelliJ IDEA files
+*.iml
+.idea/
+
+# Keystore files & credentials
+*.jks
+*.keystore
+*.p12
+*.key
 debug.keystore
+
+# External native build folder
+.externalNativeBuild
+.cxx/
+captures/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Ephemeral agent & brainstorming artifacts
+.superpowers/
+.agents/skills/

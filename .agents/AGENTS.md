@@ -1,9 +1,9 @@
 # SwiftScan Project Agent Router (`.agents/AGENTS.md`)
 
 ## 1. Operational Rules
-1. **Target Directory:** All code and assets reside inside `C:\Users\khair\MyProjects\SwiftScan`.
+1. **Target Directory:** All code and assets reside inside the project workspace repository.
 2. **Architecture Standard:** Android Jetpack Compose + CameraX + Google ML Kit Barcode Scanning + Room SQLite.
-3. **Design Contract:** Follow [DESIGN.md](file:///C:/Users/khair/MyProjects/SwiftScan/DESIGN.md) for all colors, radii, motion timings, and UI layouts.
+3. **Design Contract:** Follow [DESIGN.md](../DESIGN.md) for all colors, radii, motion timings, and UI layouts.
 4. **Lightweight Execution:** Zero unnecessary third-party dependencies. Rely on Android native APIs and Google ML Kit.
 5. **Security First:** Always parse and inspect URLs through `SecurityUtils` before allowing intent dispatches.
 6. **Build Deliverable:** Must produce a clean, installable `.apk` file (`dist/SwiftScan.apk`).

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin 2.0, Jetpack Compose, CameraX 1.4+, Google ML Kit Vision, ZXing Core 3.5+, Room SQLite, Robolectric.
 
-**Spec:** [`docs/superpowers/specs/2026-11-01-turbo-swiftscan-personal-revamp-design.md`](file:///c:/Users/khair/MyProjects/SwiftScan/docs/superpowers/specs/2026-11-01-turbo-swiftscan-personal-revamp-design.md)
+**Spec:** [`docs/superpowers/specs/2026-11-01-turbo-swiftscan-personal-revamp-design.md`](docs/superpowers/specs/2026-11-01-turbo-swiftscan-personal-revamp-design.md)
 
 ---
 
